@@ -1,7 +1,7 @@
 import prisma from "../../prisma/prisma";
 
 export class OrderService {
-    async createOrder(data: any) {
+    async createOrder(data: any, user: any) {
         const { customerName, customerEmail, customerPhone, address, cartItems } = data;
 
         let totalAmount = 0;
@@ -35,6 +35,7 @@ export class OrderService {
                 customerPhone,
                 address,
                 totalAmount,
+                userId: user.id,
                 items: {
                     create: itemsToCreate,
                 },
@@ -43,14 +44,14 @@ export class OrderService {
         });
     }
 
-    async getOrderById(id: string) {
+    async getOrderById(id: string, user: any) {
         return await prisma.order.findUnique({
-            where: { id },
+            where: { id, userId: user.id },
             include: { items: true },
         });
     }
 
-    async getAll(page: number = 1, limit: number = 50) {
+    async getAll(page: number = 1, limit: number = 50, user: any) {
         const skip = (page - 1) * limit;
 
         const [data, total] = await Promise.all([
@@ -63,6 +64,7 @@ export class OrderService {
                 orderBy: {
                     createdAt: "desc",
                 },
+                where: { userId: user.id },
             }),
             prisma.order.count(),
         ]);

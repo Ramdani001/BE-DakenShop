@@ -17,7 +17,7 @@ export class OrderController {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 50;
 
-            const result = await this.orderService.getAll(page, limit);
+            const result = await this.orderService.getAll(page, limit, req.user);
             res.json(result);
         } catch (error: any) {
             res.status(500).json({ message: error.message });
@@ -26,7 +26,7 @@ export class OrderController {
 
     private checkout = async (req: Request, res: Response) => {
         try {
-            const result = await this.orderService.createOrder(req.body);
+            const result = await this.orderService.createOrder(req.body, req.user);
             res.status(201).json({
                 message: "Order placed successfully",
                 data: result,
@@ -38,7 +38,7 @@ export class OrderController {
 
     private getOrderDetail = async (req: Request, res: Response) => {
         try {
-            const result = await this.orderService.getOrderById(req.params.id as string);
+            const result = await this.orderService.getOrderById(req.params.id as string, req.user);
             res.json(result);
         } catch (error: any) {
             res.status(404).json({ message: error.message });

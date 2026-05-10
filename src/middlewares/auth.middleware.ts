@@ -18,7 +18,6 @@ export const authenticate = (req: Request, res: Response, next: NextFunction) =>
 export const authorize = (roles: string[]) => {
     return (req: Request, res: Response, next: NextFunction) => {
         const user = (req as any).user;
-        console.log(user.role)
         if (!user || !roles.includes(user.role)) {
             return res.status(403).json({ message: "Forbidden: You don't have access" });
         }
