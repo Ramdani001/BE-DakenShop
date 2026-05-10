@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String?
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id                 String   @id @default(uuid())
+  name               String
+  imgUrl             String
+  description        String
+  discountPercentage Decimal  @db.Decimal(10, 4)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  categoryId         String
+  category           Category @relation(fields: [categoryId], references: [id])
+
+  types ProductType[]
+}
+
+model ProductType {
+  id        String   @id @default(uuid())
+  type      String
+  price     Decimal  @db.Decimal(15, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  label     String    @unique
+  iconUrl   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  customerName  String
+  customerEmail String
+  customerPhone String
+  address       String
+  totalAmount   Decimal     @db.Decimal(15, 2)
+  status        OrderStatus @default(PENDING_PAYMENT)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items OrderItem[]
+}
+
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId   String
+  productName String
+  productType String
+  price       Decimal  @db.Decimal(15, 2)
+  quantity    Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  WAITING_PROCESS
+  PROCESSED
+  CANCELED
+  COMPLETED
+}
