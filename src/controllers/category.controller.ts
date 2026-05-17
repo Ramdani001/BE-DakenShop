@@ -42,7 +42,7 @@ export class CategoryController {
     private getAll = async (req: Request, res: Response) => {
         try {
             const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 50;
+            const limit = parseInt(req.query.limit as string) || 10; // Disesuaikan default ke 10 agar serasi dengan frontend
             const result = await this.categoryService.getAll(page, limit);
             res.json(result);
         } catch (error: any) {
@@ -65,6 +65,10 @@ export class CategoryController {
             const { label } = req.body;
             const iconUrl = req.file ? `/${UPLOAD_DIR}/${req.file.filename}` : "";
 
+            if (!label) {
+                throw new Error("Nama kategori (label) wajib diisi");
+            }
+
             const result = await this.categoryService.create({ label, iconUrl });
             res.status(201).json(result);
         } catch (error: any) {
@@ -84,7 +88,12 @@ export class CategoryController {
             const { label } = req.body;
 
             const existingCategory = await this.categoryService.getOne(id);
-            let updateData: any = { label };
+            if (!existingCategory) {
+                return res.status(404).json({ message: "Kategori tidak ditemukan" });
+            }
+
+            let updateData: any = {};
+            if (label) updateData.label = label;
 
             if (req.file) {
                 updateData.iconUrl = `/${UPLOAD_DIR}/${req.file.filename}`;
@@ -93,8 +102,10 @@ export class CategoryController {
 
             const result = await this.categoryService.update(id, updateData);
 
+            // Perbaikan pembersihan file lama jika ganti icon baru
             if (req.file && oldFileToDelete) {
-                const oldFilePath = path.join(process.cwd(), oldFileToDelete);
+                const cleanOldPath = oldFileToDelete.startsWith('/') ? oldFileToDelete.substring(1) : oldFileToDelete;
+                const oldFilePath = path.join(process.cwd(), cleanOldPath);
                 if (fs.existsSync(oldFilePath)) fs.unlinkSync(oldFilePath);
             }
 
@@ -113,14 +124,21 @@ export class CategoryController {
             const id = req.params.id as string;
 
             const category = await this.categoryService.getOne(id);
+            if (!category) {
+                return res.status(404).json({ message: "Kategori tidak ditemukan" });
+            }
+
             await this.categoryService.delete(id);
 
+            // Perbaikan pembersihan berkas gambar kategori saat dihapus dari DB
             if (category.iconUrl) {
-                const filePath = path.join(process.cwd(), category.iconUrl);
+                const cleanPath = category.iconUrl.startsWith('/') ? category.iconUrl.substring(1) : category.iconUrl;
+                const filePath = path.join(process.cwd(), cleanPath);
                 if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             }
 
-            res.status(204).send();
+            // Diubah ke status 200 dengan format JSON agar tidak memicu crash json parsing di frontend
+            res.status(200).json({ success: true, message: "Kategori berhasil dihapus" });
         } catch (error: any) {
             res.status(400).json({ message: error.message });
         }

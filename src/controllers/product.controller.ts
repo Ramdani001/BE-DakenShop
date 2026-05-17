@@ -21,7 +21,10 @@ const storage = multer.diskStorage({
     },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: { files: 4 } 
+});
 
 export class ProductController {
     public router = Router();
@@ -35,8 +38,10 @@ export class ProductController {
         this.router.get("/latest", this.getBestSeller);
         this.router.get("/", this.getAll);
         this.router.get("/:id", this.getOne);
-        this.router.post("/", authenticate, authorize([Role.ADMIN]), upload.single("image"), this.create);
-        this.router.put("/:id", authenticate, authorize([Role.ADMIN]), upload.single("image"), this.update);
+
+        this.router.post("/", authenticate, authorize([Role.ADMIN]), upload.array("image", 4), this.create);
+        this.router.put("/:id", authenticate, authorize([Role.ADMIN]), upload.array("image", 4), this.update);
+
         this.router.delete("/:id", authenticate, authorize([Role.ADMIN]), this.delete);
     }
 
@@ -74,69 +79,79 @@ export class ProductController {
     };
 
     private create = async (req: Request, res: Response) => {
-        try {
-            const { name, description, discountPercentage, categoryId, types } = req.body;
+    try {
+        const { name, description, discountPercentage, categoryId, types } = req.body;
 
-            const parsedTypes = types ? JSON.parse(types) : [];
-            const imgUrl = req.file ? `/${UPLOAD_DIR}/${req.file.filename}` : "";
+        const parsedTypes = types ? JSON.parse(types) : [];
+        
+        // 1. Ambil semua file yang diunggah (menggunakan req.files sebagai array)
+        const files = req.files as Express.Multer.File[] || [];
+        
+        // 2. Ambil file pertama sebagai gambar utama/thumbnail untuk disimpan ke database
+        const imgUrl = files.length > 0 ? `/${UPLOAD_DIR}/${files[0].filename}` : "";
 
-            const result = await this.productService.create({
-                name,
-                description,
-                discountPercentage: parseFloat(discountPercentage),
-                categoryId,
-                imgUrl,
-                types: parsedTypes,
-            });
+        const result = await this.productService.create({
+            name,
+            description,
+            discountPercentage: discountPercentage ? parseFloat(discountPercentage) : 0,
+            categoryId,
+            imgUrl,
+            types: parsedTypes,
+        });
 
-            res.status(201).json(result);
-        } catch (error: any) {
-            if (req.file) {
-                const filePath = path.join(process.cwd(), UPLOAD_DIR, req.file.filename);
-                if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-            }
-            res.status(400).json({ message: error.message });
+        res.status(201).json(result);
+    } catch (error: any) {
+        // Jika gagal proses ke DB, hapus semua file yang terlanjur masuk ke folder uploads
+        const files = req.files as Express.Multer.File[] || [];
+        files.forEach(file => {
+            const filePath = path.join(process.cwd(), UPLOAD_DIR, file.filename);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        });
+        res.status(400).json({ message: error.message });
+    }
+};
+
+private update = async (req: Request, res: Response) => {
+    let oldFileToDelete: string | null = null;
+    try {
+        const id = req.params.id as string;
+        const { name, description, discountPercentage, categoryId, types } = req.body;
+
+        const existingProduct = await this.productService.getOne(id);
+
+        let updateData: any = {
+            name,
+            description,
+            categoryId,
+        };
+
+        if (discountPercentage) updateData.discountPercentage = parseFloat(discountPercentage);
+        if (types) updateData.types = JSON.parse(types);
+
+        // 1. Cek apakah ada file baru yang diunggah saat update
+        const files = req.files as Express.Multer.File[] || [];
+        if (files.length > 0) {
+            updateData.imgUrl = `/${UPLOAD_DIR}/${files[0].filename}`;
+            oldFileToDelete = existingProduct.imgUrl;
         }
-    };
 
-    private update = async (req: Request, res: Response) => {
-        let oldFileToDelete: string | null = null;
-        try {
-            const id = req.params.id as string;
-            const { name, description, discountPercentage, categoryId, types } = req.body;
+        const result = await this.productService.update(id, updateData);
 
-            const existingProduct = await this.productService.getOne(id);
-
-            let updateData: any = {
-                name,
-                description,
-                categoryId,
-            };
-
-            if (discountPercentage) updateData.discountPercentage = parseFloat(discountPercentage);
-            if (types) updateData.types = JSON.parse(types);
-
-            if (req.file) {
-                updateData.imgUrl = `/${UPLOAD_DIR}/${req.file.filename}`;
-                oldFileToDelete = existingProduct.imgUrl;
-            }
-
-            const result = await this.productService.update(id, updateData);
-
-            if (req.file && oldFileToDelete) {
-                const oldPath = path.join(process.cwd(), oldFileToDelete);
-                if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-            }
-
-            res.json(result);
-        } catch (error: any) {
-            if (req.file) {
-                const newPath = path.join(process.cwd(), UPLOAD_DIR, req.file.filename);
-                if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
-            }
-            res.status(400).json({ message: error.message });
+        if (files.length > 0 && oldFileToDelete) {
+            const oldPath = path.join(process.cwd(), oldFileToDelete);
+            if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
         }
-    };
+
+        res.json(result);
+    } catch (error: any) {
+        const files = req.files as Express.Multer.File[] || [];
+        files.forEach(file => {
+            const newPath = path.join(process.cwd(), UPLOAD_DIR, file.filename);
+            if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
+        });
+        res.status(400).json({ message: error.message });
+    }
+};
 
     private delete = async (req: Request, res: Response) => {
         try {

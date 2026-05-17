@@ -34,3 +34,16 @@ CREATE TABLE "User" (
 
 -- CreateIndex
 CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+
+-- ==========================================
+-- SEED DATA: INSERT DEFAULT USER ADMIN
+-- ==========================================
+INSERT INTO "User" ("id", "name", "email", "password", "role", "updatedAt") 
+VALUES (
+    'admin-default-uuid-1234', 
+    'Admin - DakenShop', 
+    'admin@dakenshop.com', 
+    '$2b$10$7R3k4LpW7R3k4LpW7R3k4Oe6Yw9g8f8d8s8a8z8x8c8v8b8n8m8q1', 
+    'ADMIN', 
+    CURRENT_TIMESTAMP
+);

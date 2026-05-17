@@ -3,7 +3,8 @@ import { comparePassword, generateToken, hashPassword } from "../utils/auth.util
 
 export class AuthService {
     async register(data: any) {
-        const { email, password, name } = data;
+
+        const { email, password, name, phone, address, image } = data;
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) throw new Error("Email already registered");
@@ -15,8 +16,17 @@ export class AuthService {
                 email,
                 password: hashedPassword,
                 name,
+                phone,
+                address,
+                image,
             },
-            select: { id: true, email: true, name: true },
+
+            select: { 
+                id: true, 
+                email: true, 
+                name: true,
+                image: true 
+            },
         });
     }
 
@@ -29,10 +39,18 @@ export class AuthService {
         const isPasswordValid = await comparePassword(password, user.password);
         if (!isPasswordValid) throw new Error("Invalid email or password");
 
-        const token = generateToken({ userId: user.id, email, role: user.role });
+        const token = generateToken({ 
+            userId: user.id, 
+            email: user.email,
+            role: user.role 
+        });
 
         return {
-            user: { id: user.id, email: user.email, name: user.name },
+            user: { 
+                id: user.id, 
+                email: user.email, 
+                name: user.name
+            },
             token,
         };
     }

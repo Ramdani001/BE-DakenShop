@@ -26,25 +26,15 @@ export class ProductService {
             prisma.product.findMany({
                 skip: skip,
                 take: limit,
-                include: {
-                    types: true,
-                    category: true,
-                },
-                orderBy: {
-                    createdAt: "desc",
-                },
+                include: { types: true, category: true },
+                orderBy: { createdAt: "desc" },
             }),
             prisma.product.count(),
         ]);
 
         return {
             data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit),
-            },
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
 
@@ -59,15 +49,30 @@ export class ProductService {
 
     async create(data: any) {
         const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
+        
+        // Parsing types dari JSON string jika dikirim sebagai string FormData
+        const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
+
+        // Menyelaraskan property 'type' murni dari frontend baru & bersihkan harganya
+        const cleanTypes = parsedTypes 
+            ? parsedTypes.map(({ id, type: variantType, price, ...rest }: any) => ({
+                ...rest,
+                type: variantType || "Standard",
+                price: parseFloat(price) || 0
+              })) 
+            : [];
+
+        const cleanDiscount = discountPercentage ? parseFloat(discountPercentage) : 0;
+
         return await prisma.product.create({
             data: {
                 name,
-                imgUrl,
-                description,
-                discountPercentage,
+                imgUrl: imgUrl || "",
+                description: description || "",
+                discountPercentage: cleanDiscount,
                 categoryId,
                 types: {
-                    create: types,
+                    create: cleanTypes,
                 },
             },
             include: { types: true },
@@ -77,26 +82,46 @@ export class ProductService {
     async update(id: string, data: any) {
         const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
 
+        const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
+
+        const cleanTypes = parsedTypes 
+            ? parsedTypes.map(({ id, type: variantType, price, ...rest }: any) => ({
+                ...rest,
+                type: variantType || "Standard",
+                price: parseFloat(price) || 0
+              })) 
+            : undefined;
+
+        const cleanDiscount = discountPercentage ? parseFloat(discountPercentage) : undefined;
+
+        const updateData: any = {
+            name,
+            description,
+            categoryId,
+        };
+
+        if (imgUrl !== undefined) updateData.imgUrl = imgUrl;
+        if (cleanDiscount !== undefined) updateData.discountPercentage = cleanDiscount;
+        
+        if (cleanTypes) {
+            updateData.types = {
+                deleteMany: {}, 
+                create: cleanTypes, 
+            };
+        }
+
         return await prisma.product.update({
             where: { id },
-            data: {
-                name,
-                imgUrl,
-                description,
-                discountPercentage,
-                categoryId,
-                types: types
-                    ? {
-                          deleteMany: {},
-                          create: types,
-                      }
-                    : undefined,
-            },
+            data: updateData,
             include: { types: true },
         });
     }
 
     async delete(id: string) {
+        await prisma.productType.deleteMany({
+            where: { productId: id }
+        });
+        
         return await prisma.product.delete({ where: { id } });
     }
 }

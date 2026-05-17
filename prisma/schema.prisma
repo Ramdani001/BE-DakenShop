@@ -12,6 +12,10 @@ model User {
   email     String   @unique
   password  String
   role      Role     @default(USER)
+  phone     String?
+  image     String?
+  address   String?  @db.Text
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   orders    Order[]
