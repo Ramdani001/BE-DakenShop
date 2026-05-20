@@ -3,8 +3,8 @@ import { comparePassword, generateToken, hashPassword } from "../utils/auth.util
 
 export class AuthService {
     async register(data: any) {
-
-        const { email, password, name, phone, address, image } = data;
+        // PERBAIKAN 1: Tambahkan 'role' di sini agar bisa dibaca oleh Prisma di bawah
+        const { email, password, name, phone, address, image, role } = data;
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
         if (existingUser) throw new Error("Email already registered");
@@ -15,6 +15,7 @@ export class AuthService {
             data: {
                 email,
                 password: hashedPassword,
+                role: role || 'USER', // Beri nilai default jika tidak dikirim dari frontend
                 name,
                 phone,
                 address,
@@ -24,6 +25,7 @@ export class AuthService {
             select: { 
                 id: true, 
                 email: true, 
+                role: true,
                 name: true,
                 image: true 
             },
@@ -45,11 +47,13 @@ export class AuthService {
             role: user.role 
         });
 
+        // PERBAIKAN 2: Sertakan 'role' di dalam return object user
         return {
             user: { 
                 id: user.id, 
                 email: user.email, 
-                name: user.name
+                name: user.name,
+                role: user.role // <-- INI DIA YANG MEMBUAT FRONTEND ANDA MANDEK KEMARIN!
             },
             token,
         };
