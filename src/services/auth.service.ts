@@ -15,7 +15,7 @@ export class AuthService {
             data: {
                 email,
                 password: hashedPassword,
-                role: role || 'USER', // Beri nilai default jika tidak dikirim dari frontend
+                role: role || 'USER',
                 name,
                 phone,
                 address,
@@ -47,13 +47,12 @@ export class AuthService {
             role: user.role 
         });
 
-        // PERBAIKAN 2: Sertakan 'role' di dalam return object user
         return {
             user: { 
                 id: user.id, 
                 email: user.email, 
                 name: user.name,
-                role: user.role // <-- INI DIA YANG MEMBUAT FRONTEND ANDA MANDEK KEMARIN!
+                role: user.role
             },
             token,
         };

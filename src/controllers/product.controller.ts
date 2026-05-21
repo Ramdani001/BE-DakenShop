@@ -78,30 +78,36 @@ export class ProductController {
         }
     };
 
-    private create = async (req: Request, res: Response) => {
+   private create = async (req: Request, res: Response) => {
     try {
-        const { name, description, discountPercentage, categoryId, types } = req.body;
+    
+        const { name, description, discountPercentage, categoryId, types, imgUrl } = req.body;
 
         const parsedTypes = types ? JSON.parse(types) : [];
         
-        // 1. Ambil semua file yang diunggah (menggunakan req.files sebagai array)
+  
         const files = req.files as Express.Multer.File[] || [];
         
-        // 2. Ambil file pertama sebagai gambar utama/thumbnail untuk disimpan ke database
-        const imgUrl = files.length > 0 ? `/${UPLOAD_DIR}/${files[0].filename}` : "";
+       
+        let finalImgUrl = "";
+        if (files.length > 0) {
+            finalImgUrl = `/${UPLOAD_DIR}/${files[0].filename}`;
+        } else if (imgUrl) {
+            finalImgUrl = imgUrl;
+        }
 
         const result = await this.productService.create({
             name,
             description,
             discountPercentage: discountPercentage ? parseFloat(discountPercentage) : 0,
             categoryId,
-            imgUrl,
+            imgUrl: finalImgUrl,
             types: parsedTypes,
         });
 
         res.status(201).json(result);
     } catch (error: any) {
-        // Jika gagal proses ke DB, hapus semua file yang terlanjur masuk ke folder uploads
+        
         const files = req.files as Express.Multer.File[] || [];
         files.forEach(file => {
             const filePath = path.join(process.cwd(), UPLOAD_DIR, file.filename);
