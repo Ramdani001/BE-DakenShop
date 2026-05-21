@@ -1,4 +1,7 @@
 import prisma from "../../prisma/prisma";
+// 1. Pastikan mengimport asli objek Enum dari Prisma Client
+import { OrderStatus } from "@prisma/client"; 
+
 const midtransClient = require('midtrans-client');
 
 // Inisialisasi Midtrans Snap Client
@@ -13,12 +16,11 @@ export class OrderService {
 
         let totalAmount = 0;
         const itemsToCreate = [];
-        const midtransItems = []; // Khusus format item detail ke midtrans
+        const midtransItems = [];
 
-        // 1. Validasi produk & kalkulasi total harga
         for (const item of cartItems) {
             const productType = await prisma.productType.findUnique({
-                where: { id: item.variantId || item.productTypeId }, // handle kecocokan key id varian
+                where: { id: item.variantId || item.productTypeId },
                 include: { product: true },
             });
 
@@ -40,14 +42,12 @@ export class OrderService {
                 id: productType.id,
                 price: itemPrice,
                 quantity: item.quantity,
-                name: `${productType.product.name} (${productType.type})`.substring(0, 50) // limit batas karakter midtrans
+                name: `${productType.product.name} (${productType.type})`.substring(0, 50)
             });
         }
 
-        // 2. Buat ID Order unik terlebih dahulu
         const orderId = "DS-" + Date.now() + Math.floor(1000 + Math.random() * 9000);
 
-        // 3. Siapkan Payload parameter untuk dikirim ke Midtrans Snap
         const parameter = {
             transaction_details: {
                 order_id: orderId,
@@ -64,20 +64,19 @@ export class OrderService {
             enabled_payments: ["credit_card", "gopay", "shopeepay", "permata_va", "bca_va", "bni_va", "bri_va", "echannel", "cimb_va"]
         };
 
-        // 4. Request token ke Midtrans
         const transaction = await snap.createTransaction(parameter);
 
-        // 5. Simpan data transaksi final ke database beserta token dari Midtrans
         return await prisma.order.create({
             data: {
-                id: orderId, // Menggunakan custom orderId yang terdaftar di midtrans
+                id: orderId,
                 customerName,
                 customerEmail,
                 customerPhone,
                 address,
                 totalAmount,
                 userId: user.id,
-                status: "PENDING",
+                // PERBAIKAN TOTAL: Masukkan objek enum murni tanpa casting string!
+                status: OrderStatus.PENDING_PAYMENT, 
                 snapToken: transaction.token,
                 snapUrl: transaction.redirect_url,
                 items: {
@@ -88,36 +87,41 @@ export class OrderService {
         });
     }
 
-    // Fungsi untuk mengupdate status dari webhook notification Midtrans
     async handleNotification(notificationData: any) {
         const statusResponse = await snap.transaction.notification(notificationData);
         const orderId = statusResponse.order_id;
         const transactionStatus = statusResponse.transaction_status;
         const fraudStatus = statusResponse.fraud_status;
 
-        let finalStatus = "PENDING";
+        // Tentukan tipe variabel secara ketat sesuai skema Enum Prisma
+        let finalStatus: OrderStatus = OrderStatus.PENDING_PAYMENT; 
 
         if (transactionStatus === 'capture') {
-            if (fraudStatus === 'challenge') finalStatus = "CHALLENGE";
-            else if (fraudStatus === 'accept') finalStatus = "SETTLEMENT";
+            if (fraudStatus === 'challenge') {
+                finalStatus = OrderStatus.PENDING_PAYMENT; 
+            } else if (fraudStatus === 'accept') {
+                finalStatus = OrderStatus.WAITING_PROCESS; 
+            }
         } else if (transactionStatus === 'settlement') {
-            finalStatus = "SETTLEMENT";
+            finalStatus = OrderStatus.WAITING_PROCESS; 
         } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
-            finalStatus = "CANCELLED";
+            finalStatus = OrderStatus.CANCELED; 
         } else if (transactionStatus === 'pending') {
-            finalStatus = "PENDING";
+            finalStatus = OrderStatus.PENDING_PAYMENT;
         }
 
         return await prisma.order.update({
             where: { id: orderId },
-            data: { status: finalStatus }
+            data: { 
+                // PERBAIKAN TOTAL: Masukkan objek enum murni ke metode update!
+                status: finalStatus 
+            }
         });
     }
 
-    // ... mempertahankan method getOrderById dan getAll lama Anda
     async getOrderById(id: string, user: any) {
         return await prisma.order.findUnique({
-            where: { id },
+            where: { id, userId: user.id },
             include: { items: true },
         });
     }
