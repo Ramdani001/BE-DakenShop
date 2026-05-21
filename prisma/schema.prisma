@@ -18,9 +18,10 @@ model User {
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  
+  // PERBAIKAN: Menjaga relasi array ke model Order
   orders    Order[]
   
-  // RELASI TAMBAHAN: Satu User memiliki satu Cart
   cart      Cart?
 }
 
@@ -37,7 +38,6 @@ model Product {
 
   types    ProductType[]
   
-  // RELASI TAMBAHAN: Produk bisa masuk ke banyak CartItem milik user berbeda
   cartItems CartItem[]
 }
 
@@ -60,9 +60,6 @@ model Category {
   products  Product[]
 }
 
-// ===================================================
-// MODEL BARU 1: KEPALA KERANJANG BELANJA (CART)
-// ===================================================
 model Cart {
   id        String     @id @default(uuid())
   userId    String     @unique // @unique menjamin 1 User hanya punya 1 keranjang aktif
@@ -84,13 +81,15 @@ model CartItem {
   cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  // Mencegah duplikasi baris jika user memasukkan produk yang sama berkali-kali
   @@unique([cartId, productId]) 
 }
 
 model Order {
   id            String      @id @default(uuid())
   userId        String
+  
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   customerName  String
   customerEmail String
   customerPhone String
