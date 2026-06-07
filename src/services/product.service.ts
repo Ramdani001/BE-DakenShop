@@ -50,10 +50,8 @@ export class ProductService {
     async create(data: any) {
         const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
         
-        // Parsing types dari JSON string jika dikirim sebagai string FormData
         const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
 
-        // Menyelaraskan property 'type' murni dari frontend baru & bersihkan harganya
         const cleanTypes = parsedTypes 
             ? parsedTypes.map(({ id, type: variantType, price, ...rest }: any) => ({
                 ...rest,

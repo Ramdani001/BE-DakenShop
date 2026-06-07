@@ -42,7 +42,7 @@ export class CategoryController {
     private getAll = async (req: Request, res: Response) => {
         try {
             const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10; // Disesuaikan default ke 10 agar serasi dengan frontend
+            const limit = parseInt(req.query.limit as string) || 10;
             const result = await this.categoryService.getAll(page, limit);
             res.json(result);
         } catch (error: any) {
@@ -102,7 +102,6 @@ export class CategoryController {
 
             const result = await this.categoryService.update(id, updateData);
 
-            // Perbaikan pembersihan file lama jika ganti icon baru
             if (req.file && oldFileToDelete) {
                 const cleanOldPath = oldFileToDelete.startsWith('/') ? oldFileToDelete.substring(1) : oldFileToDelete;
                 const oldFilePath = path.join(process.cwd(), cleanOldPath);
@@ -130,14 +129,12 @@ export class CategoryController {
 
             await this.categoryService.delete(id);
 
-            // Perbaikan pembersihan berkas gambar kategori saat dihapus dari DB
             if (category.iconUrl) {
                 const cleanPath = category.iconUrl.startsWith('/') ? category.iconUrl.substring(1) : category.iconUrl;
                 const filePath = path.join(process.cwd(), cleanPath);
                 if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
             }
 
-            // Diubah ke status 200 dengan format JSON agar tidak memicu crash json parsing di frontend
             res.status(200).json({ success: true, message: "Kategori berhasil dihapus" });
         } catch (error: any) {
             res.status(400).json({ message: error.message });

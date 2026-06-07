@@ -20,7 +20,6 @@ export class VariantController {
 
     private getByProduct = async (req: Request, res: Response) => {
         try {
-            // PERBAIKAN: Tambahkan 'as string' untuk mengatasi masalah tipe string[]
             const productId = req.params.productId as string;
             
             const result = await this.variantService.getByProduct(productId);
@@ -40,7 +39,7 @@ export class VariantController {
             const result = await this.variantService.create({ 
                 name, 
                 price, 
-                productId: productId as string // PERBAIKAN: Tegaskan tipe data ke string
+                productId: productId as string
             });
             res.status(201).json(result);
         } catch (error: any) {
@@ -50,7 +49,6 @@ export class VariantController {
 
     private update = async (req: Request, res: Response) => {
         try {
-            // PERBAIKAN: Tambahkan 'as string'
             const id = req.params.id as string;
             const { name, price } = req.body;
             
@@ -63,7 +61,6 @@ export class VariantController {
 
     private delete = async (req: Request, res: Response) => {
         try {
-            // PERBAIKAN: Tambahkan 'as string'
             const id = req.params.id as string;
             
             await this.variantService.delete(id);

@@ -10,8 +10,7 @@ export class OrderController {
         this.router.get("/", authenticate, this.getAll);
         this.router.post("/checkout", authenticate, this.checkout);
         this.router.get("/:id", authenticate, this.getOrderDetail);
-        
-        // Route Webhook untuk menerima update otomatis dari server Midtrans (Tanpa authenticate)
+
         this.router.post("/notification", this.webHookNotification);
     }
 
@@ -31,7 +30,7 @@ export class OrderController {
             const result = await this.orderService.createOrder(req.body, req.user);
             res.status(201).json({
                 message: "Order placed successfully",
-                data: result, // Mengembalikan token midtrans di dalam data ini
+                data: result,
             });
         } catch (error: any) {
             res.status(400).json({ message: error.message });

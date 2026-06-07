@@ -1,12 +1,11 @@
 import { Request, Response, Router } from "express";
-import { CartService } from "../services/cart.service"; // Sesuaikan path folder service Anda
+import { CartService } from "../services/cart.service";
 import { authenticate, authorize } from "../middlewares/auth.middleware";
 import { Role } from "@prisma/client";
 
 const cartService = new CartService();
 
 export class CartController {
-    // Deklarasikan properti router agar bisa dibaca oleh rootRouter
     public router = Router();
 
     constructor() {

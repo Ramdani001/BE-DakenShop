@@ -1,9 +1,7 @@
-import prisma from "../../prisma/prisma"; // Sesuaikan dengan path instansiasi prisma Anda
+import prisma from "../../prisma/prisma";
 
 export class VariantService {
-    /**
-     * Mengambil semua varian berdasarkan ID produk tertentu
-     */
+
     async getByProduct(productId: string) {
         const productExists = await prisma.product.findUnique({
             where: { id: productId }
@@ -15,15 +13,12 @@ export class VariantService {
 
         return await prisma.productType.findMany({
             where: { productId },
-            orderBy: { type: "asc" } // 👈 Selesai! Diganti ke 'type' sesuai schema.prisma
+            orderBy: { type: "asc" }
         });
     }
 
-    /**
-     * Menambahkan varian baru ke dalam produk
-     */
     async create(data: { name: string; price: number; productId: string }) {
-        const { name, price, productId } = data; // Tetap menerima 'name' dari frontend
+        const { name, price, productId } = data;
 
         if (!name || name.trim() === "") {
             throw new Error("Variant name is required");
@@ -41,16 +36,13 @@ export class VariantService {
 
         return await prisma.productType.create({
             data: {
-                type: name, // 👈 Dipetakan: frontend 'name' masuk ke kolom 'type' di Prisma
+                type: name,
                 price: Number(price) || 0,
                 productId
             }
         });
     }
 
-    /**
-     * Memperbarui detail varian berdasarkan ID Varian
-     */
     async update(id: string, data: { name?: string; price?: number }) {
         const { name, price } = data;
 
@@ -64,7 +56,7 @@ export class VariantService {
         const updateData: any = {};
         if (name !== undefined) {
             if (name.trim() === "") throw new Error("Variant name cannot be empty");
-            updateData.type = name; // 👈 Dipetakan ke kolom 'type'
+            updateData.type = name;
         }
         if (price !== undefined) {
             if (price < 0) throw new Error("Price cannot be negative");
@@ -77,9 +69,6 @@ export class VariantService {
         });
     }
 
-    /**
-     * Menghapus varian spesifik berdasarkan ID
-     */
     async delete(id: string) {
         const existingVariant = await prisma.productType.findUnique({
             where: { id }

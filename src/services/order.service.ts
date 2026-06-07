@@ -1,10 +1,9 @@
 import prisma from "../../prisma/prisma";
-// 1. Pastikan mengimport asli objek Enum dari Prisma Client
+
 import { OrderStatus } from "@prisma/client"; 
 
 const midtransClient = require('midtrans-client');
 
-// Inisialisasi Midtrans Snap Client
 const snap = new midtransClient.Snap({
     isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
     serverKey: process.env.MIDTRANS_SERVER_KEY

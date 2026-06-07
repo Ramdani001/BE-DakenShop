@@ -3,7 +3,6 @@ import { comparePassword, generateToken, hashPassword } from "../utils/auth.util
 
 export class AuthService {
     async register(data: any) {
-        // PERBAIKAN 1: Tambahkan 'role' di sini agar bisa dibaca oleh Prisma di bawah
         const { email, password, name, phone, address, image, role } = data;
 
         const existingUser = await prisma.user.findUnique({ where: { email } });
