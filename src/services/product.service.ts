@@ -77,57 +77,53 @@ export class ProductService {
         });
     }
 
-   async updateProduct(id: string, data: any, file?: any) {
-  const { name, categoryId, description, discountPercentage, types } = data;
-  
-  // 1. Validasi & Parse 'types' dengan aman agar menjadi Array Objek
-  let parsedTypes = [];
-  if (types) {
-    parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
-  }
+    async update(id: string, data: any) {
+    const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
 
-  // 2. Gunakan database transaction ($transaction) agar proses update terisolasi dengan aman
-  return await prisma.$transaction(async (tx) => {
-    
-    // A. Update data utama pada table Product
-    const updatedProduct = await tx.product.update({
-      where: { id: id },
-      data: {
+    // 1. Parsing data types dengan aman (mengantisipasi jika berupa JSON string dari FormData)
+    const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
+
+    // 2. Bersihkan payload array varian agar HANYA membawa field yang ada di skema ProductType
+    // Kita buang id, productId, createdAt, dan updatedAt lama agar tidak merusak validasi Prisma
+    const cleanTypes = parsedTypes 
+        ? parsedTypes.map((t: any) => ({
+            type: t.type || "Standard",
+            price: parseFloat(t.price) || 0
+          })) 
+        : undefined;
+
+    const cleanDiscount = discountPercentage ? parseFloat(discountPercentage) : undefined;
+
+    // 3. Bangun objek data utama untuk tabel Product
+    const updateData: any = {
         name,
         description: description || "-",
-        discountPercentage: Number(discountPercentage) || 0,
         categoryId: categoryId || null,
-        // Jika user mengunggah foto baru, update field imgUrl
-        ...(file ? { imgUrl: `/uploads/${file.filename}` } : {}),
-      },
-    });
+    };
 
-    // B. Bersihkan data lama di table ProductType yang terikat dengan productId ini
-    // Pendekatan "Hapus lama, Tanam Baru" adalah standar industri untuk relasi tipe dinamis
-    await tx.productType.deleteMany({
-      where: { productId: id }
-    });
-
-    // C. Masukkan data tipe/varian yang baru dikirim dari frontend
-    if (parsedTypes && parsedTypes.length > 0) {
-      await tx.productType.createMany({
-        data: parsedTypes.map((t: any) => ({
-          type: t.type || "Standard",
-          price: Number(t.price) || 0,
-          productId: id, // Hubungkan ke parent product saat ini
-        })),
-      });
+    // PERBAIKAN: Petakan ke kolom 'image' sesuai dengan skema database Anda, bukan 'imgUrl'
+    if (imgUrl !== undefined) {
+        updateData.image = imgUrl;
+    }
+    
+    if (cleanDiscount !== undefined) {
+        updateData.discountPercentage = cleanDiscount;
+    }
+    
+    // 4. Jalankan mutasi atomik menggunakan atomic transaction agar data sinkron total
+    if (cleanTypes) {
+        updateData.types = {
+            deleteMany: {}, // Hapus semua varian lama yang terikat dengan productId ini
+            create: cleanTypes, // Tanam ulang varian baru yang bersih dari frontend
+        };
     }
 
-    // D. Kembalikan data Product yang sudah ter-update secara utuh beserta relasi types-nya
-    return await tx.product.findUnique({
-      where: { id: id },
-      include: {
-        types: true,
-        category: true
-      }
+    // 5. Eksekusi ke database. Kolom 'updatedAt' otomatis diperbarui oleh PostgreSQL/Prisma
+    return await prisma.product.update({
+        where: { id },
+        data: updateData,
+        include: { types: true },
     });
-  });
 }
 
     async delete(id: string) {
