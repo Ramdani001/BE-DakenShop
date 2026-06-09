@@ -1,7 +1,6 @@
 import { Request, Response, Router } from "express";
 import { CartService } from "../services/cart.service";
-import { authenticate, authorize } from "../middlewares/auth.middleware";
-import { Role } from "@prisma/client";
+import { authenticate } from "../middlewares/auth.middleware";
 
 const cartService = new CartService();
 
@@ -12,15 +11,19 @@ export class CartController {
         this.initRoutes();
     }
 
-private initRoutes() {
-    
-    this.router.get("/", authenticate, this.getCart);
-    this.router.post("/add", this.addToCart);
-    this.router.put("/item/:id", authenticate, this.updateQuantity);
-    this.router.delete("/item/:id", authenticate, this.removeItem);
-    this.router.delete("/clear", authenticate, this.clearCart);
-}
+    private initRoutes() {
+        // =========================================================================
+        // SINKRONISASI JALUR ROUTE: Mengubah "/add" menjadi "/" agar klop dengan frontend
+        // Wajib pasang middleware 'authenticate' agar (req as any).user.id terisi aman
+        // =========================================================================
+        this.router.get("/", authenticate, this.getCart);
+        this.router.post("/", authenticate, this.addToCart); // Jalur utama: POST /api/cart
+        this.router.put("/item/:id", authenticate, this.updateQuantity);
+        this.router.delete("/item/:id", authenticate, this.removeItem);
+        this.router.delete("/clear", authenticate, this.clearCart);
+    }
 
+    // 1. GET /api/cart
     async getCart(req: Request, res: Response) {
         try {
             const userId = (req as any).user?.id; 
@@ -43,19 +46,18 @@ private initRoutes() {
         }
     }
 
-    // 2. POST /api/cart/add
+    // 2. POST /api/cart
     async addToCart(req: Request, res: Response) {
         try {
+            // Berkat ditambahkan middleware 'authenticate' di initRoutes, baris ini sekarang 100% aman terisi
             const userId = (req as any).user?.id;
             const { productId, quantity } = req.body;
 
-            console.log(userId)
-
             if (!userId) {
-                return res.status(401).json({ message: "Unauthorized." });
+                return res.status(401).json({ message: "Unauthorized. Silakan login terlebih dahulu." });
             }
 
-            if (!productId || !quantity || quantity <= 0) {
+            if (!productId || quantity === undefined || Number(quantity) <= 0) {
                 return res.status(400).json({ message: "Product ID dan Quantity yang valid wajib diisi." });
             }
 
@@ -80,7 +82,6 @@ private initRoutes() {
     // 3. PUT /api/cart/item/:id
     async updateQuantity(req: Request, res: Response) {
         try {
-            // SOLUSI: Ditambahkan 'as string' untuk menegaskan tipe data ke TypeScript
             const cartItemId = req.params.id as string;
             const { quantity } = req.body;
 
@@ -106,7 +107,6 @@ private initRoutes() {
     // 4. DELETE /api/cart/item/:id
     async removeItem(req: Request, res: Response) {
         try {
-            // SOLUSI: Ditambahkan 'as string' untuk menegaskan tipe data ke TypeScript
             const cartItemId = req.params.id as string;
 
             await cartService.removeItem(cartItemId);
