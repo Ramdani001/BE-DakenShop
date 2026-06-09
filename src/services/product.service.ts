@@ -53,10 +53,9 @@ export class ProductService {
         const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
 
         const cleanTypes = parsedTypes 
-            ? parsedTypes.map(({ id, type: variantType, price, ...rest }: any) => ({
-                ...rest,
-                type: variantType || "Standard",
-                price: parseFloat(price) || 0
+            ? parsedTypes.map((t: any) => ({
+                type: t.type || "Standard",
+                price: parseFloat(t.price) || 0
               })) 
             : [];
 
@@ -65,72 +64,69 @@ export class ProductService {
         return await prisma.product.create({
             data: {
                 name,
-                imgUrl: imgUrl || "",
-                description: description || "",
+                imgUrl: imgUrl || "[]",
+                description: description || "-",
                 discountPercentage: cleanDiscount,
-                categoryId,
+                categoryId: categoryId || null,
                 types: {
                     create: cleanTypes,
                 },
             },
-            include: { types: true },
+            include: { types: true, category: true },
         });
     }
 
     async update(id: string, data: any) {
-    const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
+        const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
 
-    // 1. Parsing data types dengan aman (mengantisipasi jika berupa JSON string dari FormData)
-    const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
+        const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
 
-    // 2. Bersihkan payload array varian agar HANYA membawa field yang ada di skema ProductType
-    // Kita buang id, productId, createdAt, dan updatedAt lama agar tidak merusak validasi Prisma
-    const cleanTypes = parsedTypes 
-        ? parsedTypes.map((t: any) => ({
-            type: t.type || "Standard",
-            price: parseFloat(t.price) || 0
-          })) 
-        : undefined;
+        const cleanTypes = parsedTypes 
+            ? parsedTypes.map((t: any) => ({
+                type: t.type || "Standard",
+                price: parseFloat(t.price) || 0
+              })) 
+            : undefined;
 
-    const cleanDiscount = discountPercentage ? parseFloat(discountPercentage) : undefined;
+        const cleanDiscount = discountPercentage ? parseFloat(discountPercentage) : undefined;
 
-    // 3. Bangun objek data utama untuk tabel Product
-    const updateData: any = {
-        name,
-        description: description || "-",
-        categoryId: categoryId || null,
-    };
-
-    // PERBAIKAN: Petakan ke kolom 'image' sesuai dengan skema database Anda, bukan 'imgUrl'
-    if (imgUrl !== undefined) {
-        updateData.image = imgUrl;
-    }
-    
-    if (cleanDiscount !== undefined) {
-        updateData.discountPercentage = cleanDiscount;
-    }
-    
-    // 4. Jalankan mutasi atomik menggunakan atomic transaction agar data sinkron total
-    if (cleanTypes) {
-        updateData.types = {
-            deleteMany: {}, // Hapus semua varian lama yang terikat dengan productId ini
-            create: cleanTypes, // Tanam ulang varian baru yang bersih dari frontend
+        const updateData: any = {
+            name,
+            description: description || "-",
+            categoryId: categoryId || null,
         };
-    }
 
-    // 5. Eksekusi ke database. Kolom 'updatedAt' otomatis diperbarui oleh PostgreSQL/Prisma
-    return await prisma.product.update({
-        where: { id },
-        data: updateData,
-        include: { types: true },
-    });
-}
+        if (imgUrl !== undefined) {
+            updateData.imgUrl = imgUrl;
+        }
+        
+        if (cleanDiscount !== undefined) {
+            updateData.discountPercentage = cleanDiscount;
+        }
+        
+        if (cleanTypes) {
+            updateData.types = {
+                deleteMany: {},
+                create: cleanTypes,
+            };
+        }
+
+        return await prisma.product.update({
+            where: { id },
+            data: updateData,
+            include: { types: true, category: true },
+        });
+    }
 
     async delete(id: string) {
-        await prisma.productType.deleteMany({
-            where: { productId: id }
+        return await prisma.$transaction(async (tx) => {
+            await tx.productType.deleteMany({
+                where: { productId: id }
+            });
+            
+            return await tx.product.delete({ 
+                where: { id } 
+            });
         });
-        
-        return await prisma.product.delete({ where: { id } });
     }
 }
