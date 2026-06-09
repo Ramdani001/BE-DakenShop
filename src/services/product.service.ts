@@ -77,43 +77,43 @@ export class ProductService {
         });
     }
 
-    async update(id: string, data: any) {
-        const { name, imgUrl, description, discountPercentage, categoryId, types } = data;
+   async updateProduct(id: string, data: any, file?: any) {
+  const { name, categoryId, description, discountPercentage, types } = data;
+  
+  const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
 
-        const parsedTypes = typeof types === "string" ? JSON.parse(types) : types;
+  return await prisma.$transaction(async (tx) => {
+    
+    const updatedProduct = await tx.product.update({
+      where: { id: id },
+      data: {
+        name,
+        description,
+        discountPercentage: Number(discountPercentage) || 0,
+        ...(file ? { imgUrl: `/uploads/${file.filename}` } : {}),
+        category: categoryId ? { connect: { id: categoryId } } : undefined,
+      },
+    });
 
-        const cleanTypes = parsedTypes 
-            ? parsedTypes.map(({ id, type: variantType, price, ...rest }: any) => ({
-                ...rest,
-                type: variantType || "Standard",
-                price: parseFloat(price) || 0
-              })) 
-            : undefined;
+    await tx.productType.deleteMany({
+      where: { productId: id }
+    });
 
-        const cleanDiscount = discountPercentage ? parseFloat(discountPercentage) : undefined;
-
-        const updateData: any = {
-            name,
-            description,
-            categoryId,
-        };
-
-        if (imgUrl !== undefined) updateData.imgUrl = imgUrl;
-        if (cleanDiscount !== undefined) updateData.discountPercentage = cleanDiscount;
-        
-        if (cleanTypes) {
-            updateData.types = {
-                deleteMany: {}, 
-                create: cleanTypes, 
-            };
-        }
-
-        return await prisma.product.update({
-            where: { id },
-            data: updateData,
-            include: { types: true },
-        });
+    if (parsedTypes && parsedTypes.length > 0) {
+      await tx.productType.createMany({
+        data: parsedTypes.map((t: any) => ({
+          type: t.type || "Standard",
+          price: Number(t.price) || 0,
+          productId: id,
+        })),
+      });
     }
+    return tx.product.findUnique({
+      where: { id: id },
+      include: { types: true }
+    });
+  });
+}
 
     async delete(id: string) {
         await prisma.productType.deleteMany({
