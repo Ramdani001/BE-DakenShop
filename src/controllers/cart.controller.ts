@@ -12,15 +12,18 @@ export class CartController {
     }
 
     private initRoutes() {
-    this.router.get("/", authenticate, this.getCart.bind(this));
-    this.router.post("/", authenticate, this.addToCart.bind(this)); 
-    this.router.put("/item/:id", authenticate, this.updateQuantity.bind(this));
-    this.router.delete("/item/:id", authenticate, this.removeItem.bind(this));
-    this.router.delete("/clear", authenticate, this.clearCart.bind(this));
-}
+        // Menggunakan reference method murni karena scope binding sudah dikunci oleh Arrow Functions di bawah
+        this.router.get("/", authenticate, this.getCart);
+        this.router.post("/", authenticate, this.addToCart); 
+        this.router.put("/item/:id", authenticate, this.updateQuantity);
+        this.router.delete("/item/:id", authenticate, this.removeItem);
+        this.router.delete("/clear", authenticate, this.clearCart);
+    }
 
-    // 1. GET /api/cart
-    async getCart(req: Request, res: Response) {
+    // ==========================================
+    // ACTION: AMBIL DATA KERANJANG USER (GET /api/cart)
+    // ==========================================
+    private getCart = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user?.id; 
             
@@ -40,12 +43,13 @@ export class CartController {
                 message: error.message || "Terjadi kesalahan pada server.",
             });
         }
-    }
+    };
 
-    // 2. POST /api/cart
-    async addToCart(req: Request, res: Response) {
+    // ==========================================
+    // ACTION: TAMBAH ITEM KE KERANJANG (POST /api/cart)
+    // ==========================================
+    private addToCart = async (req: Request, res: Response) => {
         try {
-            // Berkat ditambahkan middleware 'authenticate' di initRoutes, baris ini sekarang 100% aman terisi
             const userId = (req as any).user?.id;
             const { productId, quantity } = req.body;
 
@@ -57,6 +61,7 @@ export class CartController {
                 return res.status(400).json({ message: "Product ID dan Quantity yang valid wajib diisi." });
             }
 
+            // Memanggil service dengan aman tanpa risiko lost scope context
             const updatedItem = await cartService.addToCart(userId, { 
                 productId, 
                 quantity: Number(quantity) 
@@ -73,10 +78,12 @@ export class CartController {
                 message: error.message || "Terjadi kesalahan saat menambah item.",
             });
         }
-    }
+    };
 
-    // 3. PUT /api/cart/item/:id
-    async updateQuantity(req: Request, res: Response) {
+    // ==========================================
+    // ACTION: UPDATE QUANTITY ITEM (PUT /api/cart/item/:id)
+    // ==========================================
+    private updateQuantity = async (req: Request, res: Response) => {
         try {
             const cartItemId = req.params.id as string;
             const { quantity } = req.body;
@@ -98,10 +105,12 @@ export class CartController {
                 message: error.message || "Gagal memperbarui jumlah item.",
             });
         }
-    }
+    };
 
-    // 4. DELETE /api/cart/item/:id
-    async removeItem(req: Request, res: Response) {
+    // ==========================================
+    // ACTION: HAPUS SATU ITEM (DELETE /api/cart/item/:id)
+    // ==========================================
+    private removeItem = async (req: Request, res: Response) => {
         try {
             const cartItemId = req.params.id as string;
 
@@ -117,10 +126,12 @@ export class CartController {
                 message: error.message || "Gagal menghapus item.",
             });
         }
-    }
+    };
 
-    // 5. DELETE /api/cart/clear
-    async clearCart(req: Request, res: Response) {
+    // ==========================================
+    // ACTION: KOSONGKAN KERANJANG (DELETE /api/cart/clear)
+    // ==========================================
+    private clearCart = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user?.id;
 
@@ -140,5 +151,5 @@ export class CartController {
                 message: error.message || "Gagal mengosongkan keranjang.",
             });
         }
-    }
+    };
 }
