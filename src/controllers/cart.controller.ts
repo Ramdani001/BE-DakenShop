@@ -12,16 +12,12 @@ export class CartController {
     }
 
     private initRoutes() {
-        // =========================================================================
-        // SINKRONISASI JALUR ROUTE: Mengubah "/add" menjadi "/" agar klop dengan frontend
-        // Wajib pasang middleware 'authenticate' agar (req as any).user.id terisi aman
-        // =========================================================================
-        this.router.get("/", authenticate, this.getCart);
-        this.router.post("/", authenticate, this.addToCart); // Jalur utama: POST /api/cart
-        this.router.put("/item/:id", authenticate, this.updateQuantity);
-        this.router.delete("/item/:id", authenticate, this.removeItem);
-        this.router.delete("/clear", authenticate, this.clearCart);
-    }
+    this.router.get("/", authenticate, this.getCart.bind(this));
+    this.router.post("/", authenticate, this.addToCart.bind(this)); 
+    this.router.put("/item/:id", authenticate, this.updateQuantity.bind(this));
+    this.router.delete("/item/:id", authenticate, this.removeItem.bind(this));
+    this.router.delete("/clear", authenticate, this.clearCart.bind(this));
+}
 
     // 1. GET /api/cart
     async getCart(req: Request, res: Response) {
