@@ -89,10 +89,10 @@ export class ProductController {
             const { name, description, discountPercentage, categoryId, types, imgUrl } = req.body;
             const parsedTypes = types ? JSON.parse(types) : [];
             
-            // 1. Ambil path dari berkas-berkas biner baru hasil proses Multer
+            // Tampung seluruh path file baru yang berhasil masuk lewat Multer
             let imagePaths: string[] = files.map(file => `/${UPLOAD_DIR}/${file.filename}`);
 
-            // Jalur fallback: Mengantisipasi jika data datang via Import Excel
+            // Jalur fallback: Jika diunggah lewat import Excel
             if (imagePaths.length === 0 && imgUrl) {
                 try {
                     imagePaths = imgUrl.startsWith("[") ? JSON.parse(imgUrl) : [imgUrl];
@@ -101,10 +101,7 @@ export class ProductController {
                 }
             }
 
-            // 2. FORCE VALIDATION: Pastikan array dibersihkan dari teks string kosong ("") akibat form input liar
-            imagePaths = imagePaths.filter(p => p && p.trim() !== "");
-
-            // 3. SINKRONISASI MUTLAK: Selalu bungkus menjadi JSON string array ["..."] saat disimpan ke Postgres
+            // SINKRONISASI: Menggunakan 'imgUrl' sesuai dengan skema database Prisma Anda
             const result = await this.productService.create({
                 name,
                 description,
@@ -116,7 +113,7 @@ export class ProductController {
 
             res.status(201).json(result);
         } catch (error: any) {
-            // Rollback Mechanism: Bersihkan file fisik di server jika transaksi database gagal ditolak
+            // Rollback Mechanism: Hapus berkas fisik di server jika query database gagal
             files.forEach(file => {
                 const filePath = path.join(process.cwd(), UPLOAD_DIR, file.filename);
                 if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
@@ -134,25 +131,22 @@ export class ProductController {
             const id = req.params.id as string;
             const { name, description, discountPercentage, categoryId, types, existingImages } = req.body;
 
-            // 1. Ambil data record lama dari database untuk keperluan komparasi sinkronisasi file
+            // 1. Ambil data produk lama dari database menggunakan Service
             const existingProduct = await this.productService.getOne(id);
 
-            // 2. Ambil sisa daftar file gambar lama yang dipertahankan oleh user di UI frontend
+            // 2. Ambil sisa daftar gambar lama yang dipertahankan user dari frontend
             let retainedImages: string[] = [];
             if (existingImages) {
                 retainedImages = typeof existingImages === "string" ? JSON.parse(existingImages) : existingImages;
             }
 
-            // 3. Petakan berkas gambar baru murni hasil tangkapan upload.array() Multer
+            // 3. Petakan berkas gambar baru hasil unggahan lokal komputer
             const newUploadedImages = files.map(file => `/${UPLOAD_DIR}/${file.filename}`);
 
-            // 4. Gabungkan sisa gambar lama + berkas baru ke dalam satu kesatuan array
-            let finalImagesArray = [...retainedImages, ...newUploadedImages];
+            // 4. Gabungkan sisa gambar lama dan berkas baru ke dalam satu array tunggal
+            const finalImagesArray = [...retainedImages, ...newUploadedImages];
 
-            // Bersihkan data array dari space kosong liar sebelum di-serialize
-            finalImagesArray = finalImagesArray.filter(p => p && p.trim() !== "");
-
-            // 5. Bangun objek data dengan enkapsulasi key 'imgUrl' dalam bentuk JSON string array
+            // SINKRONISASI: Properti diubah kembali menjadi 'imgUrl' agar klop dengan Prisma
             const updateData: any = {
                 name,
                 description,
@@ -163,23 +157,22 @@ export class ProductController {
             if (discountPercentage) updateData.discountPercentage = parseFloat(discountPercentage);
             if (types) updateData.types = typeof types === "string" ? JSON.parse(types) : types;
 
-            // 6. Eksekusi pembaruan data relasional ke database via Service
+            // 5. Eksekusi pembaruan ke database lewat service
             const result = await this.productService.update(id, updateData);
 
-            // 7. GARBAGE COLLECTION: Hapus file fisik lama di server jika sengaja dibuang via klik tombol X di frontend
+            // 6. GARBAGE COLLECTION: Bersihkan file fisik di server yang dihapus user lewat tombol X
             let oldImagesInDb: string[] = [];
             if (existingProduct && existingProduct.imgUrl) {
-                const rawDbImg = existingProduct.imgUrl.trim();
                 try {
-                    oldImagesInDb = rawDbImg.startsWith("[") ? JSON.parse(rawDbImg) : [rawDbImg];
+                    oldImagesInDb = existingProduct.imgUrl.startsWith("[") ? JSON.parse(existingProduct.imgUrl) : [existingProduct.imgUrl];
                 } catch {
-                    oldImagesInDb = [rawDbImg];
+                    oldImagesInDb = [existingProduct.imgUrl];
                 }
             }
 
-            // Jika file lama di DB tidak terdaftar lagi di dalam array gabungan yang baru, singkirkan dari server
+            // Jika file lama di DB tidak terdaftar lagi di array baru, hapus filenya secara permanen
             oldImagesInDb.forEach((oldImg) => {
-                if (oldImg && !finalImagesArray.includes(oldImg) && !oldImg.startsWith("http")) {
+                if (!finalImagesArray.includes(oldImg) && !oldImg.startsWith("http")) {
                     const deletePath = path.join(process.cwd(), oldImg);
                     if (fs.existsSync(deletePath)) {
                         fs.unlinkSync(deletePath);
@@ -189,7 +182,7 @@ export class ProductController {
 
             res.json(result);
         } catch (error: any) {
-            // Bersihkan sisa file baru jika proses update dibatalkan/gagal di level internal database
+            // Bersihkan file baru jika proses update gagal ditolak sistem database
             files.forEach(file => {
                 const newPath = path.join(process.cwd(), UPLOAD_DIR, file.filename);
                 if (fs.existsSync(newPath)) fs.unlinkSync(newPath);
@@ -205,18 +198,17 @@ export class ProductController {
         try {
             const id = req.params.id as string;
 
-            // Ambil data produk master sebelum dieksekusi hapus untuk mengambil metadata gambar
+            // Ambil data produk terlebih dahulu untuk mengekstrak berkas gambar
             const product = await this.productService.getOne(id);
             await this.productService.delete(id);
 
-            // Sapu bersih seluruh file fisik gambar yang terikat dengan produk ini di storage server Anda
+            // SINKRONISASI: Membaca properti 'imgUrl' produk saat proses hapus file dari storage
             if (product && product.imgUrl) {
                 let imagesToDelete: string[] = [];
-                const rawDbImg = product.imgUrl.trim();
                 try {
-                    imagesToDelete = rawDbImg.startsWith("[") ? JSON.parse(rawDbImg) : [rawDbImg];
+                    imagesToDelete = product.imgUrl.startsWith("[") ? JSON.parse(product.imgUrl) : [product.imgUrl];
                 } catch {
-                    imagesToDelete = [rawDbImg];
+                    imagesToDelete = [product.imgUrl];
                 }
 
                 imagesToDelete.forEach((imgUrlPath) => {
