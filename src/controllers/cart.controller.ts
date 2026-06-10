@@ -1,28 +1,24 @@
 import { Request, Response, Router } from "express";
-import { CartService } from "../services/cart.service";
 import { authenticate } from "../middlewares/auth.middleware";
+import { CartService } from "../services/cart.service";
 
 const cartService = new CartService();
-
 export class CartController {
-    public router = Router();
 
-    constructor() {
-        this.initRoutes();
-    }
-
-    private initRoutes() {
-        // Menggunakan reference method murni karena scope binding sudah dikunci oleh Arrow Functions di bawah
+     public router = Router();
+    
+        constructor() {
+            this.initializeRoutes();
+        }
+    
+        private initializeRoutes() {
         this.router.get("/", authenticate, this.getCart);
         this.router.post("/", authenticate, this.addToCart); 
         this.router.put("/item/:id", authenticate, this.updateQuantity);
         this.router.delete("/item/:id", authenticate, this.removeItem);
         this.router.delete("/clear", authenticate, this.clearCart);
-    }
+        }
 
-    // ==========================================
-    // ACTION: AMBIL DATA KERANJANG USER (GET /api/cart)
-    // ==========================================
     private getCart = async (req: Request, res: Response) => {
         try {
             const userId = (req as any).user?.id; 
