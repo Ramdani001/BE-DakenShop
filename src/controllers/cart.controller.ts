@@ -3,145 +3,94 @@ import { authenticate } from "../middlewares/auth.middleware";
 import { CartService } from "../services/cart.service";
 
 const cartService = new CartService();
-export class CartController {
 
-     public router = Router();
-    
-        constructor() {
-            this.initializeRoutes();
-        }
-    
-        private initializeRoutes() {
+export class CartController {
+    public router = Router();
+
+    constructor() {
+        this.initializeRoutes();
+    }
+
+    private initializeRoutes() {
         this.router.get("/", authenticate, this.getCart);
-        this.router.post("/", authenticate, this.addToCart); 
+        this.router.post("/", authenticate, this.addToCart);
         this.router.put("/item/:id", authenticate, this.updateQuantity);
         this.router.delete("/item/:id", authenticate, this.removeItem);
         this.router.delete("/clear", authenticate, this.clearCart);
-        }
+    }
+
+    // Helper untuk memastikan input selalu string
+    private toString = (value: any): string => {
+        return Array.isArray(value) ? value[0] : (value || "");
+    };
+
+    private getUserId = (req: Request): string => {
+        const user = (req as any).user;
+        return user ? (user.id || user.userId || "") : "";
+    };
 
     private getCart = async (req: Request, res: Response) => {
         try {
-            const userId = (req as any).user?.id; 
-            
-            if (!userId) {
-                return res.status(401).json({ message: "Unauthorized. User ID tidak ditemukan." });
-            }
+            const userId = this.getUserId(req);
+            if (!userId) return res.status(401).json({ success: false, message: "Unauthorized." });
 
             const cart = await cartService.getCartByUserId(userId);
-            return res.status(200).json({
-                success: true,
-                message: "Berhasil mengambil data keranjang.",
-                data: cart,
-            });
+            return res.status(200).json({ success: true, data: cart });
         } catch (error: any) {
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Terjadi kesalahan pada server.",
-            });
+            return res.status(500).json({ success: false, message: error.message });
         }
     };
 
     private addToCart = async (req: Request, res: Response) => {
         try {
-            const userId = req.user?.userId;
+            const userId = this.getUserId(req);
             const { productId, quantity } = req.body;
 
-            if (!userId) {
-                return res.status(401).json({ message: "Unauthorized. Silakan login terlebih dahulu." });
-            }
-
-            if (!productId || quantity === undefined || Number(quantity) <= 0) {
-                return res.status(400).json({ message: "Product ID dan Quantity yang valid wajib diisi." });
-            }
+            if (!userId) return res.status(401).json({ success: false, message: "Unauthorized." });
+            if (!productId || !quantity) return res.status(400).json({ message: "Invalid input." });
 
             const updatedItem = await cartService.addToCart(userId, { 
-                productId, 
+                productId: this.toString(productId), 
                 quantity: Number(quantity) 
             });
 
-            return res.status(201).json({
-                success: true,
-                message: "Produk berhasil ditambahkan ke keranjang.",
-                data: updatedItem,
-            });
+            return res.status(201).json({ success: true, data: updatedItem });
         } catch (error: any) {
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Terjadi kesalahan saat menambah item.",
-            });
+            return res.status(500).json({ success: false, message: error.message });
         }
     };
 
-    // ==========================================
-    // ACTION: UPDATE QUANTITY ITEM (PUT /api/cart/item/:id)
-    // ==========================================
     private updateQuantity = async (req: Request, res: Response) => {
         try {
-            const cartItemId = req.params.id as string;
+            const cartItemId = this.toString(req.params.id);
             const { quantity } = req.body;
 
-            if (quantity === undefined || isNaN(Number(quantity))) {
-                return res.status(400).json({ message: "Quantity harus berupa angka." });
-            }
-
             const updatedItem = await cartService.updateQuantity(cartItemId, Number(quantity));
-
-            return res.status(200).json({
-                success: true,
-                message: "Jumlah item berhasil diperbarui.",
-                data: updatedItem,
-            });
+            return res.status(200).json({ success: true, data: updatedItem });
         } catch (error: any) {
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Gagal memperbarui jumlah item.",
-            });
+            return res.status(500).json({ success: false, message: error.message });
         }
     };
 
-    // ==========================================
-    // ACTION: HAPUS SATU ITEM (DELETE /api/cart/item/:id)
-    // ==========================================
     private removeItem = async (req: Request, res: Response) => {
         try {
-            const cartItemId = req.params.id as string;
-
+            const cartItemId = this.toString(req.params.id);
             await cartService.removeItem(cartItemId);
-
-            return res.status(200).json({
-                success: true,
-                message: "Item berhasil dihapus dari keranjang.",
-            });
+            return res.status(200).json({ success: true, message: "Item dihapus." });
         } catch (error: any) {
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Gagal menghapus item.",
-            });
+            return res.status(500).json({ success: false, message: error.message });
         }
     };
 
-    // ==========================================
-    // ACTION: KOSONGKAN KERANJANG (DELETE /api/cart/clear)
-    // ==========================================
     private clearCart = async (req: Request, res: Response) => {
         try {
-            const userId = (req as any).user?.id;
-
-            if (!userId) {
-                return res.status(401).json({ message: "Unauthorized." });
-            }
+            const userId = this.getUserId(req);
+            if (!userId) return res.status(401).json({ message: "Unauthorized." });
 
             await cartService.clearCart(userId);
-
-            return res.status(200).json({
-                success: true,
-                message: "Seluruh isi keranjang berhasil dikosongkan.",
-            });
+            return res.status(200).json({ success: true, message: "Keranjang dikosongkan." });
         } catch (error: any) {
-            return res.status(500).json({
-                success: false,
-                message: error.message || "Gagal mengosongkan keranjang.",
-            });
+            return res.status(500).json({ success: false, message: error.message });
         }
     };
 }
