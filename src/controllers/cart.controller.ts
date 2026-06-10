@@ -41,12 +41,9 @@ export class CartController {
         }
     };
 
-    // ==========================================
-    // ACTION: TAMBAH ITEM KE KERANJANG (POST /api/cart)
-    // ==========================================
     private addToCart = async (req: Request, res: Response) => {
         try {
-            const userId = (req as any).user?.id;
+            const userId = req.user?.userId;
             const { productId, quantity } = req.body;
 
             if (!userId) {
@@ -57,7 +54,6 @@ export class CartController {
                 return res.status(400).json({ message: "Product ID dan Quantity yang valid wajib diisi." });
             }
 
-            // Memanggil service dengan aman tanpa risiko lost scope context
             const updatedItem = await cartService.addToCart(userId, { 
                 productId, 
                 quantity: Number(quantity) 
