@@ -21,12 +21,11 @@ export class CartController {
 
     // Helper untuk memastikan input selalu string
     private toString = (value: any): string => {
-        return Array.isArray(value) ? value[0] : (value || "");
+        return Array.isArray(value) ? value[0] : value || "";
     };
 
     private getUserId = (req: Request): string => {
-        const user = (req as any).user;
-        return user ? (user.id || user.userId || "") : "";
+        return req.user?.userId || "";
     };
 
     private getCart = async (req: Request, res: Response) => {
@@ -44,14 +43,15 @@ export class CartController {
     private addToCart = async (req: Request, res: Response) => {
         try {
             const userId = this.getUserId(req);
-            const { productId, quantity } = req.body;
+            const { productId, quantity, productTypeId } = req.body;
 
             if (!userId) return res.status(401).json({ success: false, message: "Unauthorized." });
             if (!productId || !quantity) return res.status(400).json({ message: "Invalid input." });
 
-            const updatedItem = await cartService.addToCart(userId, { 
-                productId: this.toString(productId), 
-                quantity: Number(quantity) 
+            const updatedItem = await cartService.addToCart(userId, {
+                productId: this.toString(productId),
+                productTypeId: this.toString(productTypeId),
+                quantity: Number(quantity),
             });
 
             return res.status(201).json({ success: true, data: updatedItem });

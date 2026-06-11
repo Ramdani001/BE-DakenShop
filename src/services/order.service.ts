@@ -1,12 +1,12 @@
 import prisma from "../../prisma/prisma";
 
-import { OrderStatus } from "@prisma/client"; 
+import { OrderStatus } from "@prisma/client";
 
-const midtransClient = require('midtrans-client');
+const midtransClient = require("midtrans-client");
 
 const snap = new midtransClient.Snap({
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === 'true',
-    serverKey: process.env.MIDTRANS_SERVER_KEY
+    isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+    serverKey: process.env.MIDTRANS_SERVER_KEY,
 });
 
 export class OrderService {
@@ -19,13 +19,15 @@ export class OrderService {
 
         for (const item of cartItems) {
             const productType = await prisma.productType.findUnique({
-                where: { id: item.variantId || item.productTypeId },
+                where: { id: item.typeId },
                 include: { product: true },
             });
 
             if (!productType) throw new Error(`Produk tidak ditemukan atau varian tidak valid`);
 
-            const itemPrice = Number(productType.price);
+            const discountPercentage = Number(item.product?.discountPercentage) || 100;
+
+            const itemPrice = Number(productType.price) - (discountPercentage !== 100 ? (discountPercentage / 100) * Number(productType.price) : 0);
             const subTotal = itemPrice * item.quantity;
             totalAmount += subTotal;
 
@@ -41,7 +43,7 @@ export class OrderService {
                 id: productType.id,
                 price: itemPrice,
                 quantity: item.quantity,
-                name: `${productType.product.name} (${productType.type})`.substring(0, 50)
+                name: `${productType.product.name} (${productType.type})`.substring(0, 50),
             });
         }
 
@@ -50,7 +52,7 @@ export class OrderService {
         const parameter = {
             transaction_details: {
                 order_id: orderId,
-                gross_amount: totalAmount
+                gross_amount: totalAmount,
             },
             item_details: midtransItems,
             customer_details: {
@@ -58,12 +60,16 @@ export class OrderService {
                 email: customerEmail,
                 phone: customerPhone,
                 billing_address: { address: address },
-                shipping_address: { address: address }
+                shipping_address: { address: address },
             },
-            enabled_payments: ["credit_card", "gopay", "shopeepay", "permata_va", "bca_va", "bni_va", "bri_va", "echannel", "cimb_va"]
+            enabled_payments: ["credit_card", "gopay", "shopeepay", "permata_va", "bca_va", "bni_va", "bri_va", "echannel", "cimb_va"],
         };
 
-        const transaction = await snap.createTransaction(parameter);
+        // const transaction = await snap.createTransaction(parameter);
+        const transaction = {
+            token: "xxx",
+            redirect_url: "www.google.com",
+        };
 
         return await prisma.order.create({
             data: {
@@ -73,11 +79,58 @@ export class OrderService {
                 customerPhone,
                 address,
                 totalAmount,
-                userId: user.id,
+                userId: user.userId,
                 // PERBAIKAN TOTAL: Masukkan objek enum murni tanpa casting string!
-                status: OrderStatus.PENDING_PAYMENT, 
+                status: OrderStatus.PENDING_PAYMENT,
                 snapToken: transaction.token,
                 snapUrl: transaction.redirect_url,
+                items: {
+                    create: itemsToCreate,
+                },
+            },
+            include: { items: true },
+        });
+    }
+
+    async createWa(data: any, user: any) {
+        const { address, customerEmail, customerName, customerPhone, orderItems } = data;
+
+        let totalAmount = 0;
+        let orderItem = orderItems[0];
+        const itemsToCreate = [];
+
+        const productType = await prisma.productType.findUnique({
+            where: { id: orderItem.productTypeId },
+            include: { product: true },
+        });
+
+        if (!productType) throw new Error(`Produk tidak ditemukan atau varian tidak valid`);
+
+        // TODO perhitugnan discount
+        totalAmount = Number(orderItem.price) * orderItem.quantity;
+
+        itemsToCreate.push({
+            productId: productType.productId,
+            productName: productType.product.name,
+            productType: productType.type,
+            price: totalAmount,
+            quantity: orderItem.quantity,
+        });
+
+        const orderId = "DS-" + Date.now() + Math.floor(1000 + Math.random() * 9000);
+
+        return await prisma.order.create({
+            data: {
+                id: orderId,
+                customerName,
+                customerEmail,
+                customerPhone,
+                address,
+                totalAmount,
+                userId: user.userId,
+                status: OrderStatus.PENDING_PAYMENT,
+                snapToken: null,
+                snapUrl: null,
                 items: {
                     create: itemsToCreate,
                 },
@@ -93,28 +146,28 @@ export class OrderService {
         const fraudStatus = statusResponse.fraud_status;
 
         // Tentukan tipe variabel secara ketat sesuai skema Enum Prisma
-        let finalStatus: OrderStatus = OrderStatus.PENDING_PAYMENT; 
+        let finalStatus: OrderStatus = OrderStatus.PENDING_PAYMENT;
 
-        if (transactionStatus === 'capture') {
-            if (fraudStatus === 'challenge') {
-                finalStatus = OrderStatus.PENDING_PAYMENT; 
-            } else if (fraudStatus === 'accept') {
-                finalStatus = OrderStatus.WAITING_PROCESS; 
+        if (transactionStatus === "capture") {
+            if (fraudStatus === "challenge") {
+                finalStatus = OrderStatus.PENDING_PAYMENT;
+            } else if (fraudStatus === "accept") {
+                finalStatus = OrderStatus.WAITING_PROCESS;
             }
-        } else if (transactionStatus === 'settlement') {
-            finalStatus = OrderStatus.WAITING_PROCESS; 
-        } else if (transactionStatus === 'cancel' || transactionStatus === 'deny' || transactionStatus === 'expire') {
-            finalStatus = OrderStatus.CANCELED; 
-        } else if (transactionStatus === 'pending') {
+        } else if (transactionStatus === "settlement") {
+            finalStatus = OrderStatus.WAITING_PROCESS;
+        } else if (transactionStatus === "cancel" || transactionStatus === "deny" || transactionStatus === "expire") {
+            finalStatus = OrderStatus.CANCELED;
+        } else if (transactionStatus === "pending") {
             finalStatus = OrderStatus.PENDING_PAYMENT;
         }
 
         return await prisma.order.update({
             where: { id: orderId },
-            data: { 
+            data: {
                 // PERBAIKAN TOTAL: Masukkan objek enum murni ke metode update!
-                status: finalStatus 
-            }
+                status: finalStatus,
+            },
         });
     }
 

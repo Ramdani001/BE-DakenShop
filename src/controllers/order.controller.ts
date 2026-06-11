@@ -9,6 +9,7 @@ export class OrderController {
     constructor() {
         this.router.get("/", authenticate, this.getAll);
         this.router.post("/checkout", authenticate, this.checkout);
+        this.router.post("/checkout-wa", authenticate, this.checkoutWa);
         this.router.get("/:id", authenticate, this.getOrderDetail);
 
         this.router.post("/notification", this.webHookNotification);
@@ -28,6 +29,18 @@ export class OrderController {
     private checkout = async (req: Request, res: Response) => {
         try {
             const result = await this.orderService.createOrder(req.body, req.user);
+            res.status(201).json({
+                message: "Order placed successfully",
+                data: result,
+            });
+        } catch (error: any) {
+            res.status(400).json({ message: error.message });
+        }
+    };
+
+    private checkoutWa = async (req: Request, res: Response) => {
+        try {
+            const result = await this.orderService.createWa(req.body, req.user);
             res.status(201).json({
                 message: "Order placed successfully",
                 data: result,

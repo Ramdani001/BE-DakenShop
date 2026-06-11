@@ -1,31 +1,30 @@
 import prisma from "../../prisma/prisma";
 
 export class CartService {
-
     async getCartByUserId(userId: string) {
-
         let cart = await prisma.cart.findUnique({
             where: { userId },
             include: {
                 items: {
                     include: {
                         product: {
-                            include: { types: true } 
-                        }, 
+                            include: { types: true },
+                        },
+                        productType: true,
                     },
-                    orderBy: { createdAt: "asc" }, 
+                    orderBy: { createdAt: "asc" },
                 },
             },
         });
 
         if (!cart) {
-    
             cart = await prisma.cart.create({
                 data: { userId },
                 include: {
                     items: {
                         include: {
-                            product: { include: { types: true } }
+                            product: { include: { types: true } },
+                            productType: true,
                         },
                     },
                 },
@@ -34,7 +33,7 @@ export class CartService {
 
         const totalPrice = cart.items.reduce((sum: number, item: any) => {
             const productPrice = item.product?.types?.[0]?.price ? Number(item.product.types[0].price) : 0;
-            return sum + (productPrice * item.quantity);
+            return sum + productPrice * item.quantity;
         }, 0);
 
         const totalItems = cart.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
@@ -44,11 +43,11 @@ export class CartService {
             summary: {
                 totalItems,
                 totalPrice,
-            }
+            },
         };
     }
 
-    async addToCart(userId: string, data: { productId: string; quantity: number }) {
+    async addToCart(userId: string, data: { productId: string; productTypeId: string; quantity: number }) {
         const cartWrapper = await this.getCartByUserId(userId);
         const cartId = cartWrapper.id;
 
@@ -56,11 +55,11 @@ export class CartService {
             where: {
                 cartId: cartId,
                 productId: data.productId,
+                typeId: data.productTypeId,
             },
         });
 
         if (existingItem) {
-
             return await prisma.cartItem.update({
                 where: { id: existingItem.id },
                 data: {
@@ -73,6 +72,7 @@ export class CartService {
             data: {
                 cartId: cartId,
                 productId: data.productId,
+                typeId: data.productTypeId,
                 quantity: data.quantity,
             },
         });
@@ -103,7 +103,7 @@ export class CartService {
 
     async clearCart(userId: string) {
         const cartWrapper = await this.getCartByUserId(userId);
-        
+
         return await prisma.cartItem.deleteMany({
             where: { cartId: cartWrapper.id },
         });
