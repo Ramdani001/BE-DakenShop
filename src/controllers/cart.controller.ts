@@ -60,13 +60,14 @@ export class CartController {
     };
 
     private updateQuantity = async (req: Request, res: Response) => {
-        console.log("ID yang diterima:", req.params.id);
-        console.log("Body yang diterima:", req.body);
         try {
             const cartItemId = this.toString(req.params.id);
             const { quantity } = req.body;
-
+            console.log("ID yang diterima:", req.params.id);
+            
             const updatedItem = await cartService.updateQuantity(cartItemId, Number(quantity));
+            console.log("Body yang diterima:", updatedItem);
+
             return res.status(200).json({ success: true, data: updatedItem });
         } catch (error: any) {
             return res.status(500).json({ success: false, message: error.message });
@@ -74,6 +75,7 @@ export class CartController {
     };
 
     private removeItem = async (req: Request, res: Response) => {
+        console.log("ID yang diterima:", req.params.id);
         try {
             const cartItemId = this.toString(req.params.id);
             await cartService.removeItem(cartItemId);
