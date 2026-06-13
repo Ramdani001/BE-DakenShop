@@ -19,7 +19,6 @@ export class CartController {
         this.router.delete("/clear", authenticate, this.clearCart);
     }
 
-    // Helper untuk memastikan input selalu string
     private toString = (value: any): string => {
         return Array.isArray(value) ? value[0] : value || "";
     };
@@ -61,6 +60,8 @@ export class CartController {
     };
 
     private updateQuantity = async (req: Request, res: Response) => {
+        console.log("ID yang diterima:", req.params.id);
+        console.log("Body yang diterima:", req.body);
         try {
             const cartItemId = this.toString(req.params.id);
             const { quantity } = req.body;
