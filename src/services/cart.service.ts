@@ -85,13 +85,11 @@ export class CartService {
 
         const item = await prisma.cartItem.findUnique({ where: { id: cartItemId } });
         if (!item) throw new Error(`Cart item with ID ${cartItemId} not found.`);
-        
-        return item;
 
-        // return await prisma.cartItem.update({
-        //     where: { id: cartItemId },
-        //     data: { quantity },
-        // });
+        return await prisma.cartItem.update({
+            where: { id: cartItemId },
+            data: { quantity },
+        });
     }
 
     async removeItem(cartItemId: string) {

@@ -64,9 +64,9 @@ export class CartController {
             const cartItemId = this.toString(req.params.id);
             const { quantity } = req.body;
             console.log("ID yang diterima:", req.params.id);
+            console.log("Body yang diterima:", quantity);
             
             const updatedItem = await cartService.updateQuantity(cartItemId, Number(quantity));
-            console.log("Body yang diterima:", updatedItem);
 
             return res.status(200).json({ success: true, data: updatedItem });
         } catch (error: any) {
