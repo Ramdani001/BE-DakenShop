@@ -9,7 +9,7 @@ const snap = new midtransClient.Snap({
 });
 
 interface UserPayload {
-    id: string;
+    userId: string;
 }
 
 export class OrderService {
@@ -83,7 +83,7 @@ export class OrderService {
                 customerPhone,
                 address,
                 totalAmount,
-                userId: user.id,
+                userId: user.userId,
                 status: OrderStatus.PENDING_PAYMENT,
                 snapToken: transaction.token,
                 snapUrl: transaction.redirect_url,
@@ -139,7 +139,7 @@ export class OrderService {
                 customerPhone,
                 address,
                 totalAmount,
-                userId: user.id,
+                userId: user.userId,
                 status: OrderStatus.PENDING_PAYMENT,
                 snapToken: null,
                 snapUrl: null,
@@ -183,7 +183,7 @@ export class OrderService {
 
     async getOrderById(id: string, user: UserPayload) {
         return await prisma.order.findUnique({
-            where: { id, userId: user.id },
+            where: { id, userId: user.userId },
             include: { items: true },
         });
     }
@@ -196,9 +196,9 @@ export class OrderService {
                 take: limit,
                 include: { items: true },
                 orderBy: { createdAt: "desc" },
-                where: { userId: user.id },
+                where: { userId: user.userId },
             }),
-            prisma.order.count({ where: { userId: user.id } }),
+            prisma.order.count({ where: { userId: user.userId } }),
         ]);
 
         return {
